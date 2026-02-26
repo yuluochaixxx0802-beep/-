@@ -1,6 +1,12 @@
 import random
-import tkinter as tk
 from typing import Optional, Set, Tuple
+
+try:
+    import tkinter as tk
+    TK_IMPORT_ERROR = None
+except Exception as error:
+    tk = None
+    TK_IMPORT_ERROR = error
 
 
 CELL_SIZE = 20
@@ -13,7 +19,7 @@ RAINBOW_FOOD_LIFETIME = 55
 
 
 class SnakeGame:
-    def __init__(self, root: tk.Tk) -> None:
+    def __init__(self, root) -> None:
         self.root = root
         self.root.title("Colorful Snake Ultra")
 
@@ -120,7 +126,7 @@ class SnakeGame:
         if self.rainbow_food is not None:
             self.rainbow_food_timer = RAINBOW_FOOD_LIFETIME
 
-    def on_key_press(self, event: tk.Event) -> None:
+    def on_key_press(self, event) -> None:
         key = event.keysym.lower()
 
         if not self.started and key in {"space", "return"}:
@@ -363,6 +369,13 @@ class SnakeGame:
 
 
 def run() -> int:
+    if tk is None:
+        print("無法匯入 tkinter，請確認 Python 已安裝 Tk 支援。")
+        print("Windows: 重新安裝官方 Python，勾選 tcl/tk and IDLE。")
+        print("Ubuntu/Debian: sudo apt install python3-tk")
+        print(f"詳細錯誤：{TK_IMPORT_ERROR}")
+        return 1
+
     try:
         root = tk.Tk()
     except tk.TclError as error:

@@ -29,6 +29,11 @@ exit()
   - 代表目前環境沒有可用圖形桌面（常見於 SSH/WSL/雲端 shell）。
   - 請改在本機桌面環境執行，或先設定可用的圖形顯示（DISPLAY）。
 
+- `ModuleNotFoundError: No module named 'tkinter'` 或提示無法匯入 tkinter：
+  - 代表你的 Python 沒有安裝 Tk 元件。
+  - Windows：重裝官方 Python，安裝時勾選 `tcl/tk and IDLE`。
+  - Ubuntu/Debian：執行 `sudo apt install python3-tk`。
+
 ## 新玩法
 
 - 🎬 開場 Start 畫面（按 `Space` 開始）
