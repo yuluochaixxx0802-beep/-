@@ -1,5 +1,6 @@
 import random
 import tkinter as tk
+from typing import Optional, Set, Tuple
 
 
 CELL_SIZE = 20
@@ -67,7 +68,7 @@ class SnakeGame:
     def update_score_label(self) -> None:
         self.score_label.config(text=f"Score: {self.score} | Speed: {1000 // self.speed_ms} 格/秒")
 
-    def occupied_cells(self) -> set[tuple[int, int]]:
+    def occupied_cells(self) -> Set[Tuple[int, int]]:
         occupied = set(self.snake)
         if self.regular_food is not None:
             occupied.add(self.regular_food)
@@ -77,7 +78,7 @@ class SnakeGame:
             occupied.add(self.rainbow_food)
         return occupied
 
-    def random_empty_cell(self, exclude_foods: bool = True) -> tuple[int, int] | None:
+    def random_empty_cell(self, exclude_foods: bool = True) -> Optional[Tuple[int, int]]:
         occupied = set(self.snake)
         if exclude_foods:
             if self.regular_food is not None:
