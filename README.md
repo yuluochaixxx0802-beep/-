@@ -25,6 +25,10 @@ exit()
   - 代表你把 shell 指令貼進了 Python 互動模式。
   - 請退出 `>>>` 後，在終端機重新執行。
 
+- `_tkinter.TclError: no display name and no $DISPLAY environment variable`：
+  - 代表目前環境沒有可用圖形桌面（常見於 SSH/WSL/雲端 shell）。
+  - 請改在本機桌面環境執行，或先設定可用的圖形顯示（DISPLAY）。
+
 ## 新玩法
 
 - 🎬 開場 Start 畫面（按 `Space` 開始）

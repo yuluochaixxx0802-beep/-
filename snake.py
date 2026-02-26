@@ -362,7 +362,19 @@ class SnakeGame:
         self.canvas.create_rectangle(x1, y1, x2, y2, fill=color, outline=outline)
 
 
-if __name__ == "__main__":
-    root = tk.Tk()
+def run() -> int:
+    try:
+        root = tk.Tk()
+    except tk.TclError as error:
+        print("無法啟動圖形介面（Tk）。")
+        print("如果你在遠端/WSL/無桌面環境，請在本機桌面環境執行，或設定可用的 DISPLAY。")
+        print(f"詳細錯誤：{error}")
+        return 1
+
     SnakeGame(root)
     root.mainloop()
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(run())
