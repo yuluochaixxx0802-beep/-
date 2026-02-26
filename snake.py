@@ -1,5 +1,5 @@
 import random
-from typing import Optional, Set, Tuple
+from typing import Optional, Tuple
 
 try:
     import tkinter as tk
@@ -13,38 +13,39 @@ CELL_SIZE = 20
 GRID_WIDTH = 24
 GRID_HEIGHT = 24
 BASE_UPDATE_MS = 120
-MIN_UPDATE_MS = 65
-SPECIAL_FOOD_LIFETIME = 80
-RAINBOW_FOOD_LIFETIME = 55
+MIN_UPDATE_MS = 68
+STAR_FOOD_LIFETIME = 70
+
+FONT_CN = ("KaiTi", 16)
+FONT_CN_BOLD = ("KaiTi", 20, "bold")
+FONT_EN_SCRIPT = ("Segoe Script", 28, "bold")
+FONT_EN_SCRIPT_SMALL = ("Segoe Script", 18, "bold")
 
 
 class SnakeGame:
     def __init__(self, root) -> None:
         self.root = root
-        self.root.title("Colorful Snake Ultra")
+        self.root.title("Snake Bloom")
 
-        canvas_width = GRID_WIDTH * CELL_SIZE
-        canvas_height = GRID_HEIGHT * CELL_SIZE
-        self.canvas = tk.Canvas(root, width=canvas_width, height=canvas_height, bg="#0b0c1a")
+        self.canvas_width = GRID_WIDTH * CELL_SIZE
+        self.canvas_height = GRID_HEIGHT * CELL_SIZE
+        self.canvas = tk.Canvas(root, width=self.canvas_width, height=self.canvas_height, bg="#101419", highlightthickness=0)
         self.canvas.pack()
 
-        self.score_label = tk.Label(root, text="Score: 0", font=("Arial", 14, "bold"), fg="#0f0f1a")
-        self.score_label.pack(pady=8)
-
-        self.hint_label = tk.Label(
-            root,
-            text="方向鍵移動 | Space 開始 | R 重新開始",
-            font=("Arial", 10),
-            fg="#404040",
-        )
-        self.hint_label.pack(pady=(0, 8))
+        self.score_label = tk.Label(root, text="", font=FONT_CN, fg="#1f2a37", bg="#f8f8f8")
+        self.score_label.pack(fill="x", pady=(6, 0))
 
         self.root.bind("<KeyPress>", self.on_key_press)
+        self.canvas.bind("<Button-1>", self.on_canvas_click)
 
         self.after_id = None
-        self.reset_game(started=False)
+        self.menu_buttons = {}
+        self.state = "menu"
+        self.star_speed_enabled = True
+        self.reset_game()
+        self.draw()
 
-    def reset_game(self, started: bool = False) -> None:
+    def reset_game(self) -> None:
         if self.after_id is not None:
             self.root.after_cancel(self.after_id)
             self.after_id = None
@@ -55,88 +56,103 @@ class SnakeGame:
         self.direction = (1, 0)
         self.pending_direction = self.direction
         self.score = 0
-        self.game_over = False
-        self.started = started
         self.speed_ms = BASE_UPDATE_MS
+        self.game_over = False
         self.regular_food = None
-        self.special_food = None
-        self.special_food_timer = 0
-        self.rainbow_food = None
-        self.rainbow_food_timer = 0
-
-        self.place_regular_food()
-        self.maybe_spawn_special_food(force=True)
-        self.maybe_spawn_rainbow_food(force=True)
+        self.star_food = None
+        self.star_food_timer = 0
+        self.spawn_regular_food()
+        self.maybe_spawn_star_food(force=True)
         self.update_score_label()
-        self.draw()
-        if self.started:
-            self.schedule_next_tick()
 
     def update_score_label(self) -> None:
-        self.score_label.config(text=f"Score: {self.score} | Speed: {1000 // self.speed_ms} 格/秒")
+        toggle = "ON" if self.star_speed_enabled else "OFF"
+        self.score_label.config(
+            text=f"分數 {self.score}   速度 {1000 // self.speed_ms} 格/秒   星星加速(K): {toggle}"
+        )
 
-    def occupied_cells(self) -> Set[Tuple[int, int]]:
+    def available_cells(self) -> list[Tuple[int, int]]:
         occupied = set(self.snake)
         if self.regular_food is not None:
             occupied.add(self.regular_food)
-        if self.special_food is not None:
-            occupied.add(self.special_food)
-        if self.rainbow_food is not None:
-            occupied.add(self.rainbow_food)
-        return occupied
-
-    def random_empty_cell(self, exclude_foods: bool = True) -> Optional[Tuple[int, int]]:
-        occupied = set(self.snake)
-        if exclude_foods:
-            if self.regular_food is not None:
-                occupied.add(self.regular_food)
-            if self.special_food is not None:
-                occupied.add(self.special_food)
-            if self.rainbow_food is not None:
-                occupied.add(self.rainbow_food)
-
-        available = [
+        if self.star_food is not None:
+            occupied.add(self.star_food)
+        return [
             (x, y)
             for x in range(GRID_WIDTH)
             for y in range(GRID_HEIGHT)
             if (x, y) not in occupied
         ]
-        return random.choice(available) if available else None
 
-    def place_regular_food(self) -> None:
-        self.regular_food = self.random_empty_cell(exclude_foods=True)
+    def spawn_regular_food(self) -> None:
+        available = self.available_cells()
+        self.regular_food = random.choice(available) if available else None
 
-    def maybe_spawn_special_food(self, force: bool = False) -> None:
-        if self.special_food is not None:
+    def maybe_spawn_star_food(self, force: bool = False) -> None:
+        if self.star_food is not None:
             return
-        if not force and random.random() >= 0.25:
+        if not force and random.random() >= 0.18:
             return
+        available = self.available_cells()
+        self.star_food = random.choice(available) if available else None
+        if self.star_food is not None:
+            self.star_food_timer = STAR_FOOD_LIFETIME
 
-        self.special_food = self.random_empty_cell(exclude_foods=True)
-        if self.special_food is not None:
-            self.special_food_timer = SPECIAL_FOOD_LIFETIME
+    def start_game(self) -> None:
+        self.reset_game()
+        self.state = "playing"
+        self.draw()
+        self.schedule_next_tick()
 
-    def maybe_spawn_rainbow_food(self, force: bool = False) -> None:
-        if self.rainbow_food is not None:
+    def open_help(self) -> None:
+        self.state = "help"
+        self.draw()
+
+    def exit_game(self) -> None:
+        self.root.destroy()
+
+    def on_canvas_click(self, event) -> None:
+        if self.state != "menu":
             return
-        if not force and random.random() >= 0.15:
-            return
-
-        self.rainbow_food = self.random_empty_cell(exclude_foods=True)
-        if self.rainbow_food is not None:
-            self.rainbow_food_timer = RAINBOW_FOOD_LIFETIME
+        x, y = event.x, event.y
+        for name, (x1, y1, x2, y2) in self.menu_buttons.items():
+            if x1 <= x <= x2 and y1 <= y <= y2:
+                if name == "start":
+                    self.start_game()
+                elif name == "help":
+                    self.open_help()
+                elif name == "exit":
+                    self.exit_game()
+                return
 
     def on_key_press(self, event) -> None:
         key = event.keysym.lower()
 
-        if not self.started and key in {"space", "return"}:
-            self.started = True
+        if key == "k":
+            self.star_speed_enabled = not self.star_speed_enabled
+            self.update_score_label()
             self.draw()
-            self.schedule_next_tick()
             return
 
-        if self.game_over and key == "r":
-            self.reset_game(started=False)
+        if self.state == "menu":
+            if key in {"1", "s", "return"}:
+                self.start_game()
+            elif key in {"2", "h"}:
+                self.open_help()
+            elif key in {"3", "e", "escape"}:
+                self.exit_game()
+            return
+
+        if self.state == "help":
+            if key in {"escape", "backspace", "return"}:
+                self.state = "menu"
+                self.draw()
+            return
+
+        if self.game_over:
+            if key == "r":
+                self.state = "menu"
+                self.draw()
             return
 
         direction_map = {
@@ -146,7 +162,7 @@ class SnakeGame:
             "right": (1, 0),
         }
 
-        if key in direction_map and self.started and not self.game_over:
+        if key in direction_map and self.state == "playing":
             new_direction = direction_map[key]
             current_dx, current_dy = self.direction
             new_dx, new_dy = new_direction
@@ -154,7 +170,7 @@ class SnakeGame:
                 self.pending_direction = new_direction
 
     def schedule_next_tick(self) -> None:
-        if not self.game_over and self.started:
+        if self.state == "playing" and not self.game_over:
             self.after_id = self.root.after(self.speed_ms, self.tick)
 
     def tick(self) -> None:
@@ -165,45 +181,34 @@ class SnakeGame:
 
         hit_wall = not (0 <= new_head[0] < GRID_WIDTH and 0 <= new_head[1] < GRID_HEIGHT)
         hit_self = new_head in self.snake
-
         if hit_wall or hit_self:
             self.game_over = True
+            self.state = "game_over"
             self.draw()
             return
 
         self.snake.insert(0, new_head)
 
         ate_regular = self.regular_food is not None and new_head == self.regular_food
-        ate_special = self.special_food is not None and new_head == self.special_food
-        ate_rainbow = self.rainbow_food is not None and new_head == self.rainbow_food
+        ate_star = self.star_food is not None and new_head == self.star_food
 
         if ate_regular:
             self.score += 1
-            self.place_regular_food()
-            self.maybe_spawn_special_food()
-            self.maybe_spawn_rainbow_food()
-        elif ate_special:
-            self.score += 3
-            self.special_food = None
-            self.special_food_timer = 0
-            self.speed_ms = max(MIN_UPDATE_MS, self.speed_ms - 7)
-        elif ate_rainbow:
-            self.score += 5
-            self.rainbow_food = None
-            self.rainbow_food_timer = 0
-            self.speed_ms = max(MIN_UPDATE_MS, self.speed_ms - 3)
+            self.spawn_regular_food()
+            self.maybe_spawn_star_food()
+        elif ate_star:
+            self.score += 4
+            self.star_food = None
+            self.star_food_timer = 0
+            if self.star_speed_enabled:
+                self.speed_ms = max(MIN_UPDATE_MS, self.speed_ms - 8)
         else:
             self.snake.pop()
 
-        if self.special_food is not None:
-            self.special_food_timer -= 1
-            if self.special_food_timer <= 0:
-                self.special_food = None
-
-        if self.rainbow_food is not None:
-            self.rainbow_food_timer -= 1
-            if self.rainbow_food_timer <= 0:
-                self.rainbow_food = None
+        if self.star_food is not None:
+            self.star_food_timer -= 1
+            if self.star_food_timer <= 0:
+                self.star_food = None
 
         if self.score > 0 and self.score % 6 == 0:
             self.speed_ms = max(MIN_UPDATE_MS, self.speed_ms - 1)
@@ -214,158 +219,104 @@ class SnakeGame:
 
     def draw(self) -> None:
         self.canvas.delete("all")
-        self.draw_board_background()
+        if self.state == "menu":
+            self.draw_menu()
+            return
+        if self.state == "help":
+            self.draw_help()
+            return
 
-        for index, (x, y) in enumerate(self.snake):
-            self.draw_snake_segment(x, y, index)
+        self.draw_board()
+        for idx, (x, y) in enumerate(self.snake):
+            self.draw_snake_segment(x, y, idx)
 
         if self.regular_food is not None:
-            self.draw_round_food(self.regular_food[0], self.regular_food[1], "#ff5a5f")
+            self.draw_round_food(self.regular_food[0], self.regular_food[1], "#ff6b6b")
+        if self.star_food is not None:
+            color = "#ffd166" if self.star_food_timer % 6 < 3 else "#ffb703"
+            self.draw_star_food(self.star_food[0], self.star_food[1], color)
 
-        if self.special_food is not None:
-            flashing = self.special_food_timer % 8 < 4
-            color = "#ffd166" if flashing else "#f7b538"
-            self.draw_diamond_food(self.special_food[0], self.special_food[1], color)
+        if self.state == "game_over":
+            self.draw_game_over()
 
-        if self.rainbow_food is not None:
-            self.draw_star_food(self.rainbow_food[0], self.rainbow_food[1], "#7c4dff")
-
-        if not self.started:
-            self.draw_start_screen()
-        elif self.game_over:
-            self.draw_game_over_panel()
-
-    def draw_board_background(self) -> None:
-        palette = ("#101427", "#141b33", "#1a2140")
+    def draw_board(self) -> None:
         for x in range(GRID_WIDTH):
             for y in range(GRID_HEIGHT):
-                color = palette[(x + y) % len(palette)]
-                self.draw_cell(x, y, color, outline="#0d1122")
+                shade = "#171d24" if (x + y) % 2 == 0 else "#1f2730"
+                self.draw_cell(x, y, shade, outline="#11161d")
 
-    def get_snake_color(self, index: int) -> str:
-        if index == 0:
-            return "#86f7c2"
-        ratio = min(1.0, index / max(1, len(self.snake) - 1))
-        red = int(90 + ratio * 100)
-        green = int(235 - ratio * 90)
-        blue = int(205 - ratio * 140)
-        return f"#{red:02x}{green:02x}{blue:02x}"
+    def draw_menu_button(self, key: str, label: str, y: int) -> Tuple[int, int, int, int]:
+        x1, x2 = 120, self.canvas_width - 120
+        y1, y2 = y, y + 56
+        self.canvas.create_rectangle(x1, y1, x2, y2, fill="#1b2632", outline="#8ecae6", width=2)
+        self.canvas.create_text(self.canvas_width // 2, y + 28, text=f"{key}. {label}", fill="#ffffff", font=FONT_CN_BOLD)
+        return (x1, y1, x2, y2)
+
+    def draw_menu(self) -> None:
+        self.canvas.create_rectangle(0, 0, self.canvas_width, self.canvas_height, fill="#0f1720", outline="")
+        self.canvas.create_text(self.canvas_width // 2, 120, text="Snake Bloom", fill="#e0fbfc", font=FONT_EN_SCRIPT)
+        self.menu_buttons = {
+            "start": self.draw_menu_button("1", "Start", 190),
+            "help": self.draw_menu_button("2", "How to Play", 265),
+            "exit": self.draw_menu_button("3", "Exit", 340),
+        }
+
+    def draw_help(self) -> None:
+        self.canvas.create_rectangle(0, 0, self.canvas_width, self.canvas_height, fill="#0f1720", outline="")
+        self.canvas.create_text(self.canvas_width // 2, 110, text="How to Play", fill="#e0fbfc", font=FONT_EN_SCRIPT_SMALL)
+        lines = [
+            "方向鍵控制方向",
+            "紅色圓形食物 +1",
+            "金色星星 +4（可加速）",
+            "按 K 可切換星星加速 ON/OFF",
+            "撞牆或撞到自己會結束",
+            "Esc / Enter 返回主選單",
+        ]
+        for i, text in enumerate(lines):
+            self.canvas.create_text(self.canvas_width // 2, 180 + i * 40, text=text, fill="#f1f5f9", font=FONT_CN)
+
+    def draw_game_over(self) -> None:
+        self.canvas.create_rectangle(100, 190, self.canvas_width - 100, 300, fill="#0b0f14", outline="#ef476f", width=2)
+        self.canvas.create_text(self.canvas_width // 2, 225, text="Game Over", fill="#ffffff", font=FONT_EN_SCRIPT_SMALL)
+        self.canvas.create_text(self.canvas_width // 2, 268, text="按 R 回到主選單", fill="#ffd6a5", font=FONT_CN)
 
     def draw_snake_segment(self, x: int, y: int, index: int) -> None:
-        color = self.get_snake_color(index)
-        self.draw_cell(x, y, color, outline="#202840")
+        color = "#80ed99" if index == 0 else "#57cc99"
+        self.draw_cell(x, y, color, outline="#1b4332")
         if index == 0:
             self.draw_snake_face(x, y)
 
     def draw_snake_face(self, x: int, y: int) -> None:
-        x1 = x * CELL_SIZE
-        y1 = y * CELL_SIZE
-        cx = x1 + CELL_SIZE / 2
-        cy = y1 + CELL_SIZE / 2
-
-        eye_offsets = {
-            (1, 0): [(4, 5), (4, 14)],
-            (-1, 0): [(16, 5), (16, 14)],
-            (0, 1): [(5, 4), (14, 4)],
-            (0, -1): [(5, 16), (14, 16)],
+        x1, y1 = x * CELL_SIZE, y * CELL_SIZE
+        eye_points = {
+            (1, 0): [(5, 5), (5, 14)],
+            (-1, 0): [(15, 5), (15, 14)],
+            (0, 1): [(5, 5), (14, 5)],
+            (0, -1): [(5, 15), (14, 15)],
         }
-        pupil_offset = {
-            (1, 0): (1.5, 0),
-            (-1, 0): (-1.5, 0),
-            (0, 1): (0, 1.5),
-            (0, -1): (0, -1.5),
-        }
-
-        for ex, ey in eye_offsets.get(self.direction, eye_offsets[(1, 0)]):
+        for ex, ey in eye_points.get(self.direction, eye_points[(1, 0)]):
             self.canvas.create_oval(x1 + ex - 2, y1 + ey - 2, x1 + ex + 2, y1 + ey + 2, fill="white", outline="")
-            px, py = pupil_offset.get(self.direction, (1.5, 0))
-            self.canvas.create_oval(
-                x1 + ex + px - 1,
-                y1 + ey + py - 1,
-                x1 + ex + px + 1,
-                y1 + ey + py + 1,
-                fill="#1b1b1b",
-                outline="",
-            )
-
-        tongue_length = 6
-        dx, dy = self.direction
-        self.canvas.create_line(
-            cx,
-            cy,
-            cx + dx * tongue_length,
-            cy + dy * tongue_length,
-            fill="#ff8fab",
-            width=2,
-        )
+            self.canvas.create_oval(x1 + ex - 1, y1 + ey - 1, x1 + ex + 1, y1 + ey + 1, fill="#111", outline="")
 
     def draw_round_food(self, x: int, y: int, color: str) -> None:
         x1 = x * CELL_SIZE
         y1 = y * CELL_SIZE
-        margin = 3
-        self.canvas.create_oval(
-            x1 + margin,
-            y1 + margin,
-            x1 + CELL_SIZE - margin,
-            y1 + CELL_SIZE - margin,
-            fill=color,
-            outline="#3d1620",
-            width=2,
-        )
-
-    def draw_diamond_food(self, x: int, y: int, color: str) -> None:
-        x1 = x * CELL_SIZE
-        y1 = y * CELL_SIZE
-        c = CELL_SIZE / 2
-        points = [
-            (x1 + c, y1 + 2),
-            (x1 + CELL_SIZE - 2, y1 + c),
-            (x1 + c, y1 + CELL_SIZE - 2),
-            (x1 + 2, y1 + c),
-        ]
-        self.canvas.create_polygon(points, fill=color, outline="#664200", width=2)
+        self.canvas.create_oval(x1 + 3, y1 + 3, x1 + CELL_SIZE - 3, y1 + CELL_SIZE - 3, fill=color, outline="#651a1a", width=2)
 
     def draw_star_food(self, x: int, y: int, color: str) -> None:
         x1 = x * CELL_SIZE
         y1 = y * CELL_SIZE
         points = [
-            (x1 + 10, y1 + 2),
-            (x1 + 13, y1 + 8),
-            (x1 + 19, y1 + 8),
-            (x1 + 14, y1 + 12),
-            (x1 + 16, y1 + 18),
-            (x1 + 10, y1 + 14),
-            (x1 + 4, y1 + 18),
-            (x1 + 6, y1 + 12),
-            (x1 + 1, y1 + 8),
-            (x1 + 7, y1 + 8),
+            (x1 + 10, y1 + 2), (x1 + 13, y1 + 8), (x1 + 19, y1 + 8), (x1 + 14, y1 + 12),
+            (x1 + 16, y1 + 18), (x1 + 10, y1 + 14), (x1 + 4, y1 + 18), (x1 + 6, y1 + 12),
+            (x1 + 1, y1 + 8), (x1 + 7, y1 + 8),
         ]
-        self.canvas.create_polygon(points, fill=color, outline="#2c1461", width=2)
-        self.canvas.create_oval(x1 + 8, y1 + 8, x1 + 12, y1 + 12, fill="#c7a8ff", outline="")
+        self.canvas.create_polygon(points, fill=color, outline="#5e4800", width=2)
 
-    def draw_start_screen(self) -> None:
-        width = GRID_WIDTH * CELL_SIZE
-        height = GRID_HEIGHT * CELL_SIZE
-        self.canvas.create_rectangle(30, 80, width - 30, height - 80, fill="#090b16", outline="#7c4dff", width=3)
-        self.canvas.create_text(width // 2, 145, text="Colorful Snake Ultra", fill="#c8b6ff", font=("Arial", 28, "bold"))
-        self.canvas.create_text(width // 2, 200, text="紅圓 +1 | 金菱形 +3 | 紫星星 +5", fill="#9bf6ff", font=("Arial", 14, "bold"))
-        self.canvas.create_text(width // 2, 235, text="吃星星和金色食物都會加速！", fill="#ffd6a5", font=("Arial", 13))
-        self.canvas.create_text(width // 2, 300, text="Press SPACE to Start", fill="#ffffff", font=("Arial", 22, "bold"))
-        self.canvas.create_text(width // 2, 335, text="使用方向鍵控制蛇蛇前進", fill="#bde0fe", font=("Arial", 13))
-
-    def draw_game_over_panel(self) -> None:
-        width = GRID_WIDTH * CELL_SIZE
-        height = GRID_HEIGHT * CELL_SIZE
-        self.canvas.create_rectangle(55, height // 2 - 70, width - 55, height // 2 + 70, fill="#000000", outline="#ff5a5f", width=2)
-        self.canvas.create_text(width // 2, height // 2 - 15, text="Game Over", fill="#ffffff", font=("Arial", 26, "bold"))
-        self.canvas.create_text(width // 2, height // 2 + 18, text="Press R to restart", fill="#ffd166", font=("Arial", 14, "bold"))
-
-    def draw_cell(self, x: int, y: int, color: str, outline: str = "#202030") -> None:
+    def draw_cell(self, x: int, y: int, color: str, outline: str) -> None:
         x1 = x * CELL_SIZE
         y1 = y * CELL_SIZE
-        x2 = x1 + CELL_SIZE
-        y2 = y1 + CELL_SIZE
-        self.canvas.create_rectangle(x1, y1, x2, y2, fill=color, outline=outline)
+        self.canvas.create_rectangle(x1, y1, x1 + CELL_SIZE, y1 + CELL_SIZE, fill=color, outline=outline)
 
 
 def run() -> int:
