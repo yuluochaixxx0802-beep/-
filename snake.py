@@ -52,6 +52,7 @@ class SnakeGame:
         self.game_over = False
         self.started = started
         self.speed_ms = BASE_UPDATE_MS
+        self.regular_food = None
         self.special_food = None
         self.special_food_timer = 0
         self.rainbow_food = None
