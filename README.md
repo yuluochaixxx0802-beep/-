@@ -2,11 +2,28 @@
 
 更華麗、更有挑戰性的貪吃蛇，使用 Python 內建 `tkinter`，不需要額外安裝套件。
 
-## 執行
+## 正確執行方式（很重要）
+
+請在**終端機（Terminal）**執行，不要先進入 Python 互動模式（不要看到 `>>>` 再貼指令）。
 
 ```bash
+cd /workspace/-
 python3 snake.py
 ```
+
+如果你現在畫面是 `>>>`，先輸入：
+
+```python
+exit()
+```
+
+再回到終端機執行上面的 `python3 snake.py`。
+
+## 常見問題
+
+- `IndentationError` 或 `SyntaxError` 出現在 `File "<python-input-...>"`：
+  - 代表你把 shell 指令貼進了 Python 互動模式。
+  - 請退出 `>>>` 後，在終端機重新執行。
 
 ## 新玩法
 
